@@ -45,6 +45,7 @@ import (
 var addr = flag.String("-http", ":8080", "address to listen on")
 const version = "0.0.3"
 const sig = "[markdownd v" + version + "]"
+const serverheader = "markdownd/"+version
 
 func init() {
 	println(sig)
@@ -80,6 +81,7 @@ func rfid() string {
 var hosts = make(map[interface{}]string)
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Server", serverheader)
 	ctx := context.WithValue(r.Context(), "RequestID", rfid())
 	hosts[ctx.Value("RequestID")] = r.RemoteAddr
 	r = r.WithContext(ctx)
