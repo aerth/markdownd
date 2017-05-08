@@ -114,27 +114,27 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	abs, err := filepath.Abs(filesrc)
 	if err != nil {
 		log.Println(rfid, "error resolving absolute path:", err)
-		http.Error(w, "error #7", http.StatusNotFound)
+		http.NotFound(w,r)
 		return
 	}
 
 	_, err = os.Open(abs)
 	if err != nil {
 		log.Println(rfid, "error opening file:", err, abs)
-		http.Error(w, "error #8", http.StatusNotFound)
+		http.NotFound(w,r)
 		return
 	}
 
 	if !fileisgood(abs) {
 		log.Printf("%s error: %q is symlink. serving 404", rfid, abs)
-		http.Error(w, "error #9", http.StatusNotFound)
+		http.NotFound(w,r)
 		return
 	}
 	
 	b, err := ioutil.ReadFile(abs)
 	if err != nil {
 		log.Printf("%s error reading file: %q", rfid, filesrc)
-		http.Error(w, "no file like that 'round here", http.StatusNotFound)
+		http.NotFound(w,r)
 		return
 	}
 
