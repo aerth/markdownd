@@ -40,18 +40,23 @@ import (
 	"github.com/russross/blackfriday"
 )
 
-var addr = flag.String("http", ":8080", "address to listen on")
-var logfile = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+var (
+	addr    = flag.String("http", ":8080", "address to listen on")
+	logfile = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+)
+
 const version = "0.0.4"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
-func init(){
-	flag.Usage = func(){
+
+func init() {
+	flag.Usage = func() {
 		println(usage)
 		println("FLAGS")
 		flag.PrintDefaults()
 	}
 }
+
 const usage = `
 USAGE
 
@@ -64,12 +69,13 @@ Serve current directory on port 8080, log to stderr
 
 Serve 'docs' directory on port 8081, log to 'md.log'
 	markdownd -log md.log -http :8081`
+
 func init() {
 	println(sig)
 }
 
 func main() {
-	
+
 	flag.Parse()
 	if len(flag.Args()) != 1 {
 		println(usage)
@@ -77,14 +83,14 @@ func main() {
 		return
 	}
 
-	// get absolute path of flag.Arg(0) 
+	// get absolute path of flag.Arg(0)
 	dir := flag.Arg(0)
 	if dir == "." {
 		dir = "./"
 	}
 	var err error
 	dir, err = filepath.Abs(dir)
-	
+
 	if err != nil {
 		println(err.Error())
 		os.Exit(111)
@@ -102,14 +108,14 @@ func main() {
 	println("http filesystem:", dir)
 
 	if *logfile != os.Stderr.Name() {
-			f, err := os.OpenFile(*logfile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0660)
-			if err != nil {
-			    log.Fatalf("cant open log file: %s", err)
-			}
-			log.SetOutput(f)
+		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
+		if err != nil {
+			log.Fatalf("cant open log file: %s", err)
+		}
+		log.SetOutput(f)
 	}
 	println("log output:", *logfile)
-	
+
 	log.Println(http.ListenAndServe(*addr, srv).Error())
 	return
 }
@@ -126,10 +132,9 @@ func rfid() string {
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" || strings.Contains(r.URL.Path, "../") {
 		log.Println("bad request:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
-		http.NotFound(w,r)
+		http.NotFound(w, r)
 		return
 	}
-
 
 	basedir := filepath.Base(s.RootString)
 
@@ -175,7 +180,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// check if exists, or give 404
 	_, err = os.Open(abs)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file"){
+		if strings.Contains(err.Error(), "no such file") {
 			log.Println(requestid, "404", abs)
 			http.NotFound(w, r)
 			return
@@ -226,7 +231,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// fallthrough with http.ServeFile
 	log.Printf("%s serving %s: %s", requestid, ct, abs)
-	if !strings.HasPrefix(filepath.Base(abs), basedir){
+	if !strings.HasPrefix(filepath.Base(abs), basedir) {
 		log.Println(requestid, "bad path", abs)
 		http.NotFound(w, r)
 		return
