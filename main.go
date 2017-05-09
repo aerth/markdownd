@@ -51,7 +51,7 @@ type Server struct {
 	RootString string
 }
 
-const version = "0.0.5"
+const version = "0.0.6"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 
