@@ -56,6 +56,7 @@ func init() {
 		println("FLAGS")
 		flag.PrintDefaults()
 	}
+	rand.Seed(time.Now().UnixNano())
 }
 
 const usage = `
