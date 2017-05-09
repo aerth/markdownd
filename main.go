@@ -37,13 +37,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microcosm-cc/bluemonday"
 	"github.com/russross/blackfriday"
 )
 
 var (
-	addr    = flag.String("http", ":8080", "address to listen on")
-	logfile = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+	addr      = flag.String("http", ":8080", "address to listen on")
+	logfile   = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
 	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
 )
 
