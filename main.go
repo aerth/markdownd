@@ -138,7 +138,11 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	basedir := filepath.Base(s.RootString)
 
+	// Add Server header
 	w.Header().Add("Server", serverheader)
+
+	// Prevent page from being displayed in an iframe
+	w.Header().Add("X-Frame-Options", "DENY")
 
 	// generate unique request id
 	requestid := rfid()
