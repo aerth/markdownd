@@ -9,12 +9,14 @@
   * serves static files and downloads if not .html or .md
   * no indexing
   * no symlinks
-  * no '../' paths
+  * no `../` paths
   * raw markdown ( example: GET /index.md?raw )
 
 ## docker
 
-  * docker run -it -v $PWD/docs:/opt -p 8080:8080 aerth/markdownd
+example launch code, modify `$PWD/docs` and `8888` to suit your needs
+
+  * `docker run -it -v $PWD/docs:/opt -p 8888:8080 aerth/markdownd`
 
 ## free:
 
