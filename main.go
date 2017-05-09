@@ -27,7 +27,7 @@ package main
 
 import (
 	"flag"
-	"context"
+//	"context"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -82,8 +82,6 @@ func rfid() string {
 	return strconv.Itoa(rand.Int())
 }
 
-var hosts = make(map[interface{}]string)
-
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		log.Println(r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
@@ -92,10 +90,6 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Server", serverheader)
 	requestid := rfid()
-	ctx := context.WithValue(r.Context(), "RequestID", requestid)
-	hosts[ctx.Value("RequestID")] = r.RemoteAddr
-
-	r = r.WithContext(ctx)
 	path := r.URL.Path[1:] // remove slash
 	if path == "" {
 		path = "index.md"
