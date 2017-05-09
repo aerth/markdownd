@@ -126,7 +126,7 @@ func rfid() string {
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" || strings.Contains(r.URL.Path, "../") {
 		log.Println("bad request:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
-		http.Error(w, http.StatusText(304), 304)
+		http.NotFound(w,r)
 		return
 	}
 
