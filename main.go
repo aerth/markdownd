@@ -46,6 +46,11 @@ var (
 	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
 )
 
+type Server struct {
+	Root       http.FileSystem
+	RootString string
+}
+
 const version = "0.0.5"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
@@ -72,19 +77,18 @@ Serve current directory on port 8080, log to stderr
 Serve 'docs' directory on port 8081, log to 'md.log'
 	markdownd -log md.log -http :8081`
 
-func init() {
-	println(sig)
-}
-
 func main() {
-
+	println(sig)
 	// need only 1 argument
 	flag.Parse()
-	if len(flag.Args()) != 1 {
+	args := flag.Args()
+	if len(args) != 1 {
 		println(usage)
 		os.Exit(111)
 		return
 	}
+
+	logger := log.New(os.Stderr, "", 0)
 
 	// get absolute path of flag.Arg(0)
 	dir := flag.Arg(0)
@@ -98,23 +102,33 @@ func main() {
 	println("serving filesystem:", dir)
 
 	if *logfile != os.Stderr.Name() {
-		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
-		if err != nil {
-			log.Fatalf("cant open log file: %s", err)
-		}
-		log.SetOutput(f)
+		func(){
+			f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
+			if err != nil {
+				logger.Fatalf("cant open log file: %s", err)
+			}
+			logger.SetOutput(f)
+		}()
 	}
 
 	println("log output:", *logfile)
 
 	go func() { <-time.After(time.Second); println("listening:", *addr) }()
-	log.Println(http.ListenAndServe(*addr, srv).Error())
-	return
-}
 
-type Server struct {
-	Root       http.FileSystem
-	RootString string
+	// create a http server
+	server := &http.Server{
+		Addr: *addr,
+		Handler: srv,
+		ErrorLog: logger,
+	}
+	server.SetKeepAlivesEnabled(false)
+
+	// start serving
+	err := server.ListenAndServe()
+
+	// always non-nil
+	log.Println(err)
+	return
 }
 
 func rfid() string {
@@ -150,39 +164,46 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// generate unique request id
 	requestid := rfid()
 
-	filesrc := r.URL.Path[1:] // remove slash
+	// abs is not absolute yet
+	abs := r.URL.Path[1:] // remove slash
 
-	if filesrc == "" {
-		filesrc = *indexPage
+	if abs == "" {
+		abs = *indexPage
 	}
 
-	filesrc = s.RootString + filesrc
-
-	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
-
-	if strings.HasSuffix(filesrc, "/") {
-		log.Printf("%s %s -> %sindex.md", requestid, filesrc, filesrc)
-		filesrc += "index.md"
+	// / suffix, add *index.Page
+	if strings.HasSuffix(abs, "/") {
+		abs += "index.md"
 	}
 
-	if strings.HasSuffix(filesrc, ".html") {
-		trymd := strings.TrimSuffix(filesrc, ".html") + ".md"
-		_, err := os.Open(trymd)
-		if err == nil {
-			log.Println(requestid, filesrc, "->", trymd)
-			filesrc = trymd
-		}
-	}
+	// prepend root directory to filesrc
+	abs = s.RootString + abs
+
+	// log now that we have filename
+	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
+
 	// log how long this takes
 	defer log.Println(requestid, "closed after", time.Now().Sub(t1))
 
 	// get absolute path of requested file (could not exist)
-	abs, err := filepath.Abs(filesrc)
+	abs, err := filepath.Abs(abs)
 	if err != nil {
 		log.Println(requestid, "error resolving absolute path:", err)
 		http.NotFound(w, r)
 		return
 	}
+
+	// .html suffix
+	if strings.HasSuffix(abs, ".html") {
+		trymd := strings.TrimSuffix(abs, ".html") + ".md"
+		_, err := os.Open(trymd)
+		if err == nil {
+			log.Println(requestid, abs, "->", trymd)
+			abs = trymd
+		}
+	}
+
+
 
 	// check if exists, or give 404
 	_, err = os.Open(abs)
@@ -206,10 +227,19 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read bytes
+	// above, we checked for abs vs symlink resolved,
+	// here lets check if they have the special prefix of "basedir"
+	// probably redundant.
+	if !strings.HasPrefix(filepath.Base(abs), basedir) {
+		log.Println(requestid, "bad path", abs)
+		http.NotFound(w, r)
+		return
+	}
+
+	// read bytes (for detecting content type )
 	b, err := ioutil.ReadFile(abs)
 	if err != nil {
-		log.Printf("%s error reading file: %q", requestid, filesrc)
+		log.Printf("%s error reading file: %q", requestid, abs)
 		http.NotFound(w, r)
 		return
 	}
@@ -218,8 +248,10 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ct := http.DetectContentType(b)
 
 	// serve raw html if exists
-	if strings.HasSuffix(abs, ".html") && strings.HasPrefix(ct, "text/html") {
+	if strings.HasSuffix(abs, ".html") || strings.HasPrefix(ct, "text/html") {
+		
 		log.Println(requestid, "serving raw html:", abs)
+		w.Header().Add("Content-Type", "text/html")
 		w.Write(b)
 		return
 	}
@@ -238,11 +270,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// fallthrough with http.ServeFile
 	log.Printf("%s serving %s: %s", requestid, ct, abs)
-	if !strings.HasPrefix(filepath.Base(abs), basedir) {
-		log.Println(requestid, "bad path", abs)
-		http.NotFound(w, r)
-		return
-	}
+
 	http.ServeFile(w, r, abs)
 }
 
@@ -274,7 +302,7 @@ func fileisgood(abs string) bool {
 // prepare root filesystem directory
 func prepareDirectory(dir string) string {
 	if dir == "." {
-		dir = "./"
+		dir += "/"
 	}
 	var err error
 	dir, err = filepath.Abs(dir)
