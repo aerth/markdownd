@@ -166,7 +166,6 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// fallthrough with http.ServeFile
 	log.Printf("%s serving %s: %s", requestid, ct, abs)
 	http.ServeFile(w, r, abs)
-	w.Write([]byte(sig))
 }
 
 // fileisgood returns false if symlink
