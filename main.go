@@ -103,7 +103,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filesrc := s.RootString+path
 	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
 	if path == "" || strings.HasSuffix(path, "/"){
-		log.Printf("%s %s -> %sindex.md", rfid, filesrc, filesrc )
+		log.Printf("%s %s -> %sindex.md", requestid, filesrc, filesrc )
 		filesrc += "index.md"
 	}
 
