@@ -153,7 +153,6 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t1 := time.Now()
-	basedir := filepath.Base(s.RootString)
 
 	// Add Server header
 	w.Header().Add("Server", serverheader)
@@ -228,10 +227,10 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// above, we checked for abs vs symlink resolved,
-	// here lets check if they have the special prefix of "basedir"
+	// here lets check if they have the special prefix of "s.Root"
 	// probably redundant.
-	if !strings.HasPrefix(filepath.Base(abs), basedir) {
-		log.Println(requestid, "bad path", abs, "doesnt have prefix:", basedir)
+	if !strings.HasPrefix(abs, s.RootString) {
+		log.Println(requestid, "bad path", abs, "doesnt have prefix:", s.RootString)
 		http.NotFound(w, r)
 		return
 	}
