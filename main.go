@@ -41,24 +41,53 @@ import (
 )
 
 var addr = flag.String("http", ":8080", "address to listen on")
-
-const version = "0.0.3"
+var logfile = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+const version = "0.0.4"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
+func init(){
+	flag.Usage = func(){
+		println(usage)
+		println("FLAGS")
+		flag.PrintDefaults()
+	}
+}
+const usage = `
+USAGE
 
+markdownd [flags] [directory]
+
+EXAMPLES
+
+Serve current directory on port 8080, log to stderr
+	markdownd -log /dev/stderr -http 127.0.0.1:8080 .
+
+Serve 'docs' directory on port 8081, log to 'md.log'
+	markdownd -log md.log -http :8081`
 func init() {
 	println(sig)
 }
 
 func main() {
+	
 	flag.Parse()
 	if len(flag.Args()) != 1 {
-		println("which directory to serve?")
+		println(usage)
 		os.Exit(111)
+		return
 	}
+
+	// get absolute path of flag.Arg(0) 
 	dir := flag.Arg(0)
 	if dir == "." {
-		dir = ""
+		dir = "./"
+	}
+	var err error
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		println(err.Error())
+		os.Exit(111)
+		return
 	}
 	if !strings.HasSuffix(dir, "/") {
 		dir += "/"
@@ -68,8 +97,19 @@ func main() {
 		Root:       http.Dir(dir),
 		RootString: dir,
 	}
+	println("http filesystem:", dir)
 
-	println(http.ListenAndServe(*addr, srv).Error())
+	if *logfile != os.Stderr.Name() {
+			f, err := os.OpenFile(*logfile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0660)
+			if err != nil {
+			    log.Fatalf("cant open log file: %s", err)
+			}
+			log.SetOutput(f)
+	}
+	println("log output:", *logfile)
+	
+	log.Println(http.ListenAndServe(*addr, srv).Error())
+	return
 }
 
 type Server struct {
@@ -82,20 +122,28 @@ func rfid() string {
 }
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method != "GET" || strings.Contains(r.URL.Path, "../") {
 		log.Println(r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.Error(w, http.StatusText(304), 304)
 		return
 	}
+
 	w.Header().Add("Server", serverheader)
+
+	// generate unique request id
 	requestid := rfid()
-	path := r.URL.Path[1:] // remove slash
-	if path == "" {
-		path = "index.md"
+
+	filesrc := r.URL.Path[1:] // remove slash
+
+	if filesrc == "" {
+		filesrc = "index.md"
 	}
-	filesrc := s.RootString + path
+
+	filesrc = s.RootString + filesrc
+
 	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
-	if path == "" || strings.HasSuffix(path, "/") {
+
+	if strings.HasSuffix(filesrc, "/") {
 		log.Printf("%s %s -> %sindex.md", requestid, filesrc, filesrc)
 		filesrc += "index.md"
 	}
@@ -111,6 +159,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer log.Println(requestid, "closed")
 
+	// get absolute path of requested file (could not exist)
 	abs, err := filepath.Abs(filesrc)
 	if err != nil {
 		log.Println(requestid, "error resolving absolute path:", err)
@@ -118,13 +167,20 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// check if exists, or give 404
 	_, err = os.Open(abs)
 	if err != nil {
+		if strings.Contains(err.Error(), "no such file"){
+			log.Println(requestid, "404", abs)
+			http.NotFound(w, r)
+			return
+		}
 		log.Println(requestid, "error opening file:", err, abs)
 		http.NotFound(w, r)
 		return
 	}
 
+	// check if symlink ( to avoid /proc/self/root style attacks )
 	if !fileisgood(abs) {
 		log.Printf("%s error: %q is symlink. serving 404", requestid, abs)
 		http.NotFound(w, r)
@@ -142,16 +198,16 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// detect content type and encoding
 	ct := http.DetectContentType(b)
 
-	// serve
-	if strings.HasPrefix(ct, "text/html") {
+	// serve raw html if exists
+	if strings.HasSuffix(abs, ".html") && strings.HasPrefix(ct, "text/html") {
 		log.Println(requestid, "serving raw html:", abs)
 		w.Write(b)
 		return
 	}
 
 	// probably markdown
-	if strings.HasPrefix(ct, "text/plain") {
-		if r.FormValue("raw") != "" || strings.Contains(r.URL.RawQuery, "?raw") {
+	if strings.HasSuffix(abs, ".md") && strings.HasPrefix(ct, "text/plain") {
+		if strings.Contains(r.URL.RawQuery, "?raw") {
 			log.Println(requestid, "raw markdown request:", abs)
 			w.Write(b)
 			return
