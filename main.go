@@ -212,7 +212,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// probably markdown
 	if strings.HasSuffix(abs, ".md") && strings.HasPrefix(ct, "text/plain") {
-		if strings.Contains(r.URL.RawQuery, "?raw") {
+		if strings.Contains(r.URL.RawQuery, "raw") {
 			log.Println(requestid, "raw markdown request:", abs)
 			w.Write(b)
 			return
