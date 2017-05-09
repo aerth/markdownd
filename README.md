@@ -44,6 +44,7 @@ SOFTWARE.
   * bugs/issues very welcome
   * header/footer?
   * templates?
+  * rate limiting / preventing abuse?
 
 ## logging:
 ```
