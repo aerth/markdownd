@@ -95,7 +95,7 @@ func main() {
 		RootString: dir,
 	}
 
-	println("http filesystem:", dir)
+	println("serving filesystem:", dir)
 
 	if *logfile != os.Stderr.Name() {
 		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
@@ -107,7 +107,7 @@ func main() {
 
 	println("log output:", *logfile)
 
-	go func() { <-time.After(time.Second); println("serving:", *addr) }()
+	go func() { <-time.After(time.Second); println("listening:", *addr) }()
 	log.Println(http.ListenAndServe(*addr, srv).Error())
 	return
 }
@@ -271,6 +271,7 @@ func fileisgood(abs string) bool {
 	return realpath == abs
 }
 
+// prepare root filesystem directory
 func prepareDirectory(dir string) string {
 	if dir == "." {
 		dir = "./"
