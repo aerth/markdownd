@@ -35,6 +35,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/russross/blackfriday"
@@ -43,9 +44,10 @@ import (
 var (
 	addr    = flag.String("http", ":8080", "address to listen on")
 	logfile = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
 )
 
-const version = "0.0.4"
+const version = "0.0.5"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 
@@ -76,6 +78,7 @@ func init() {
 
 func main() {
 
+	// need only 1 argument
 	flag.Parse()
 	if len(flag.Args()) != 1 {
 		println(usage)
@@ -85,26 +88,13 @@ func main() {
 
 	// get absolute path of flag.Arg(0)
 	dir := flag.Arg(0)
-	if dir == "." {
-		dir = "./"
-	}
-	var err error
-	dir, err = filepath.Abs(dir)
-
-	if err != nil {
-		println(err.Error())
-		os.Exit(111)
-		return
-	}
-
-	if !strings.HasSuffix(dir, "/") {
-		dir += "/"
-	}
-
+	dir = prepareDirectory(dir)
+	// new server
 	srv := &Server{
 		Root:       http.Dir(dir),
 		RootString: dir,
 	}
+
 	println("http filesystem:", dir)
 
 	if *logfile != os.Stderr.Name() {
@@ -114,8 +104,10 @@ func main() {
 		}
 		log.SetOutput(f)
 	}
+
 	println("log output:", *logfile)
 
+	go func() { <-time.After(time.Second); println("serving:", *addr) }()
 	log.Println(http.ListenAndServe(*addr, srv).Error())
 	return
 }
@@ -130,12 +122,23 @@ func rfid() string {
 }
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" || strings.Contains(r.URL.Path, "../") {
-		log.Println("bad request:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+	r.Body.Close()
+
+	// all we want is GET
+	if r.Method != "GET" {
+		log.Println("bad method:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.NotFound(w, r)
 		return
 	}
 
+	// deny requests containing '../'
+	if strings.Contains(r.URL.Path, "../") {
+		log.Println("bad path:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		http.NotFound(w, r)
+		return
+	}
+
+	t1 := time.Now()
 	basedir := filepath.Base(s.RootString)
 
 	// Add Server header
@@ -150,7 +153,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filesrc := r.URL.Path[1:] // remove slash
 
 	if filesrc == "" {
-		filesrc = "index.md"
+		filesrc = *indexPage
 	}
 
 	filesrc = s.RootString + filesrc
@@ -170,8 +173,8 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			filesrc = trymd
 		}
 	}
-
-	defer log.Println(requestid, "closed")
+	// log how long this takes
+	defer log.Println(requestid, "closed after", time.Now().Sub(t1))
 
 	// get absolute path of requested file (could not exist)
 	abs, err := filepath.Abs(filesrc)
@@ -189,6 +192,8 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+
+		// probably permissions
 		log.Println(requestid, "error opening file:", err, abs)
 		http.NotFound(w, r)
 		return
@@ -227,9 +232,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Println(requestid, "serving markdown:", abs)
-		unsafe := blackfriday.MarkdownCommon(b)
-		html := bluemonday.UGCPolicy().SanitizeBytes(unsafe)
-		w.Write(html)
+		w.Write(blackfriday.MarkdownCommon(b))
 		return
 	}
 
@@ -266,4 +269,24 @@ func fileisgood(abs string) bool {
 		return false
 	}
 	return realpath == abs
+}
+
+func prepareDirectory(dir string) string {
+	if dir == "." {
+		dir = "./"
+	}
+	var err error
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		println(err.Error())
+		os.Exit(111)
+		return err.Error()
+	}
+
+	// add trailing slash
+	if !strings.HasSuffix(dir, "/") {
+		dir += "/"
+	}
+
+	return dir
 }
