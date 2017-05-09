@@ -9,6 +9,8 @@
   * serves static files and downloads if not .html or .md
   * no indexing
   * no symlinks
+  * no '../' paths
+  * raw markdown ( example: GET /index.md?raw )
 
 ## free:
 
@@ -40,6 +42,8 @@ SOFTWARE.
 
   * pull requests welcome
   * bugs/issues very welcome
+  * header/footer?
+  * templates?
 
 ## logging:
 ```
