@@ -27,7 +27,7 @@ package main
 
 import (
 	"flag"
-//	"context"
+	//	"context"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -43,9 +43,10 @@ import (
 )
 
 var addr = flag.String("http", ":8080", "address to listen on")
+
 const version = "0.0.3"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
-const serverheader = "markdownd/"+version
+const serverheader = "markdownd/" + version
 
 func init() {
 	println(sig)
@@ -61,20 +62,20 @@ func main() {
 	if dir == "." {
 		dir = ""
 	}
-	if !strings.HasSuffix(dir, "/"){
-		dir+="/"
+	if !strings.HasSuffix(dir, "/") {
+		dir += "/"
 	}
 
 	srv := &Server{
-		Root: http.Dir(dir),
+		Root:       http.Dir(dir),
 		RootString: dir,
 	}
-	
+
 	println(http.ListenAndServe(*addr, srv).Error())
 }
 
 type Server struct {
-	Root http.FileSystem
+	Root       http.FileSystem
 	RootString string
 }
 
@@ -94,15 +95,15 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		path = "index.md"
 	}
-	filesrc := s.RootString+path
+	filesrc := s.RootString + path
 	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
-	if path == "" || strings.HasSuffix(path, "/"){
-		log.Printf("%s %s -> %sindex.md", requestid, filesrc, filesrc )
+	if path == "" || strings.HasSuffix(path, "/") {
+		log.Printf("%s %s -> %sindex.md", requestid, filesrc, filesrc)
 		filesrc += "index.md"
 	}
 
-	if strings.HasSuffix(filesrc, ".html"){
-		trymd := strings.TrimSuffix(filesrc, ".html")+".md"
+	if strings.HasSuffix(filesrc, ".html") {
+		trymd := strings.TrimSuffix(filesrc, ".html") + ".md"
 		_, err := os.Open(trymd)
 		if err == nil {
 			log.Println(requestid, filesrc, "->", trymd)
@@ -111,24 +112,24 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer log.Println(requestid, "closed")
-	
+
 	abs, err := filepath.Abs(filesrc)
 	if err != nil {
 		log.Println(requestid, "error resolving absolute path:", err)
-		http.NotFound(w,r)
+		http.NotFound(w, r)
 		return
 	}
 
 	_, err = os.Open(abs)
 	if err != nil {
 		log.Println(requestid, "error opening file:", err, abs)
-		http.NotFound(w,r)
+		http.NotFound(w, r)
 		return
 	}
 
 	if !fileisgood(abs) {
 		log.Printf("%s error: %q is symlink. serving 404", requestid, abs)
-		http.NotFound(w,r)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -136,14 +137,14 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b, err := ioutil.ReadFile(abs)
 	if err != nil {
 		log.Printf("%s error reading file: %q", requestid, filesrc)
-		http.NotFound(w,r)
+		http.NotFound(w, r)
 		return
 	}
 
 	// detect content type and encoding
 	ct := http.DetectContentType(b)
 
-	// serve 
+	// serve
 	if strings.HasPrefix(ct, "text/html") {
 		log.Println(requestid, "serving raw html:", abs)
 		w.Write(b)
@@ -151,8 +152,8 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// probably markdown
-	if strings.HasPrefix(ct, "text/plain"){
-		if r.FormValue("raw") != "" || strings.Contains(r.URL.RawQuery,"?raw") {
+	if strings.HasPrefix(ct, "text/plain") {
+		if r.FormValue("raw") != "" || strings.Contains(r.URL.RawQuery, "?raw") {
 			log.Println(requestid, "raw markdown request:", abs)
 			w.Write(b)
 			return
@@ -163,7 +164,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(html)
 		return
 	}
-	
+
 	// fallthrough with http.ServeFile
 	log.Printf("%s serving %s: %s", requestid, ct, abs)
 	http.ServeFile(w, r, abs)
@@ -176,12 +177,12 @@ func fileisgood(abs string) bool {
 	if abs == "" {
 		return false
 	}
-	
+
 	var err error
 	if !filepath.IsAbs(abs) {
 		abs, err = filepath.Abs(abs)
 	}
-	
+
 	if err != nil {
 		println(err.Error())
 		return false
