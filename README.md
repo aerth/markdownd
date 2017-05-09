@@ -12,6 +12,10 @@
   * no '../' paths
   * raw markdown ( example: GET /index.md?raw )
 
+## docker
+
+  * docker run -it -v $PWD/docs:/opt -p 8080:8080 aerth/markdownd
+
 ## free:
 
 ```
