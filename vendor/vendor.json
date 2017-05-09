@@ -1,0 +1,19 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "MnRnniTE94p6DieveIFQxx3PArg=",
+			"path": "github.com/russross/blackfriday",
+			"revision": "0ba0f2b6ed7c475a92e4df8641825cb7a11d1fa3",
+			"revisionTime": "2017-05-09T06:07:14Z"
+		},
+		{
+			"checksumSHA1": "VE58NR7GGkZe2A+htz5kC39SHF0=",
+			"path": "github.com/shurcooL/sanitized_anchor_name",
+			"revision": "79c90efaf01eddc01945af5bc1797859189b830b",
+			"revisionTime": "2017-04-23T18:15:05Z"
+		}
+	],
+	"rootPath": "github.com/aerth/markdownd"
+}
