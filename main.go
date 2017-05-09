@@ -84,11 +84,13 @@ func main() {
 	}
 	var err error
 	dir, err = filepath.Abs(dir)
+	
 	if err != nil {
 		println(err.Error())
 		os.Exit(111)
 		return
 	}
+
 	if !strings.HasSuffix(dir, "/") {
 		dir += "/"
 	}
@@ -123,10 +125,13 @@ func rfid() string {
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" || strings.Contains(r.URL.Path, "../") {
-		log.Println(r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		log.Println("bad request:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.Error(w, http.StatusText(304), 304)
 		return
 	}
+
+
+	basedir := filepath.Base(s.RootString)
 
 	w.Header().Add("Server", serverheader)
 
@@ -221,6 +226,11 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// fallthrough with http.ServeFile
 	log.Printf("%s serving %s: %s", requestid, ct, abs)
+	if !strings.HasPrefix(filepath.Base(abs), basedir){
+		log.Println(requestid, "bad path", abs)
+		http.NotFound(w, r)
+		return
+	}
 	http.ServeFile(w, r, abs)
 }
 
