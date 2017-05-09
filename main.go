@@ -231,7 +231,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// here lets check if they have the special prefix of "basedir"
 	// probably redundant.
 	if !strings.HasPrefix(filepath.Base(abs), basedir) {
-		log.Println(requestid, "bad path", abs)
+		log.Println(requestid, "bad path", abs, "doesnt have prefix:", basedir)
 		http.NotFound(w, r)
 		return
 	}
