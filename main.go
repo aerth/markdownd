@@ -27,7 +27,6 @@ package main
 
 import (
 	"flag"
-	//	"context"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -39,7 +38,6 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/russross/blackfriday"
-	//	"github.com/shurcooL/github_flavored_markdown"
 )
 
 var addr = flag.String("http", ":8080", "address to listen on")
