@@ -42,30 +42,34 @@ import (
 	//	"github.com/shurcooL/github_flavored_markdown"
 )
 
-var addr = flag.String("-http", ":8080", "address to listen on")
+var addr = flag.String("http", ":8080", "address to listen on")
 const version = "0.0.3"
-const sig = "[markdownd v" + version + "]"
+const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/"+version
 
 func init() {
 	println(sig)
-	if len(os.Args) != 2 {
-		println("which directory to serve?")
-		os.Exit(111)
-	}
 }
 
 func main() {
-	srv := new(Server)
-	dir := os.Args[1]
+	flag.Parse()
+	if len(flag.Args()) != 1 {
+		println("which directory to serve?")
+		os.Exit(111)
+	}
+	dir := flag.Arg(0)
 	if dir == "." {
 		dir = ""
 	}
 	if !strings.HasSuffix(dir, "/"){
 		dir+="/"
 	}
-	srv.Root = http.Dir(dir)
-	srv.RootString = dir
+
+	srv := &Server{
+		Root: http.Dir(dir),
+		RootString: dir,
+	}
+	
 	println(http.ListenAndServe(*addr, srv).Error())
 }
 
@@ -81,18 +85,23 @@ func rfid() string {
 var hosts = make(map[interface{}]string)
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		log.Println(r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		http.Error(w, http.StatusText(304), 304)
+		return
+	}
 	w.Header().Add("Server", serverheader)
-	ctx := context.WithValue(r.Context(), "RequestID", rfid())
+	requestid := rfid()
+	ctx := context.WithValue(r.Context(), "RequestID", requestid)
 	hosts[ctx.Value("RequestID")] = r.RemoteAddr
+
 	r = r.WithContext(ctx)
 	path := r.URL.Path[1:] // remove slash
 	if path == "" {
 		path = "index.md"
 	}
 	filesrc := s.RootString+path
-
-	rfid := ctx.Value("RequestID")
-	log.Println(rfid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
+	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", filesrc)
 	if path == "" || strings.HasSuffix(path, "/"){
 		log.Printf("%s %s -> %sindex.md", rfid, filesrc, filesrc )
 		filesrc += "index.md"
@@ -102,53 +111,59 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		trymd := strings.TrimSuffix(filesrc, ".html")+".md"
 		_, err := os.Open(trymd)
 		if err == nil {
-			log.Println(rfid, filesrc, "->", trymd)
+			log.Println(requestid, filesrc, "->", trymd)
 			filesrc = trymd
 		}
 	}
 
-
-	defer log.Println(rfid, "closed")
-
+	defer log.Println(requestid, "closed")
 	
 	abs, err := filepath.Abs(filesrc)
 	if err != nil {
-		log.Println(rfid, "error resolving absolute path:", err)
+		log.Println(requestid, "error resolving absolute path:", err)
 		http.NotFound(w,r)
 		return
 	}
 
 	_, err = os.Open(abs)
 	if err != nil {
-		log.Println(rfid, "error opening file:", err, abs)
+		log.Println(requestid, "error opening file:", err, abs)
 		http.NotFound(w,r)
 		return
 	}
 
 	if !fileisgood(abs) {
-		log.Printf("%s error: %q is symlink. serving 404", rfid, abs)
+		log.Printf("%s error: %q is symlink. serving 404", requestid, abs)
 		http.NotFound(w,r)
 		return
 	}
-	
+
+	// read bytes
 	b, err := ioutil.ReadFile(abs)
 	if err != nil {
-		log.Printf("%s error reading file: %q", rfid, filesrc)
+		log.Printf("%s error reading file: %q", requestid, filesrc)
 		http.NotFound(w,r)
 		return
 	}
 
 	// detect content type and encoding
 	ct := http.DetectContentType(b)
+
+	// serve 
 	if strings.HasPrefix(ct, "text/html") {
-		log.Println(rfid, "serving raw html:", abs)
+		log.Println(requestid, "serving raw html:", abs)
 		w.Write(b)
 		return
 	}
 
 	// probably markdown
 	if strings.HasPrefix(ct, "text/plain"){
-		log.Println(rfid, "serving markdown:", abs)
+		if r.FormValue("raw") != "" || strings.Contains(r.URL.RawQuery,"?raw") {
+			log.Println(requestid, "raw markdown request:", abs)
+			w.Write(b)
+			return
+		}
+		log.Println(requestid, "serving markdown:", abs)
 		unsafe := blackfriday.MarkdownCommon(b)
 		html := bluemonday.UGCPolicy().SanitizeBytes(unsafe)
 		w.Write(html)
@@ -156,13 +171,13 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// fallthrough with http.ServeFile
-	log.Printf("%s serving %s: %s", rfid, ct, abs)
+	log.Printf("%s serving %s: %s", requestid, ct, abs)
 	http.ServeFile(w, r, abs)
 	w.Write([]byte(sig))
 }
 
-// returns false if symlink
-// comparing absolute vs resolved path is quick and effective
+// fileisgood returns false if symlink
+// comparing absolute vs resolved path is apparently quick and effective
 func fileisgood(abs string) bool {
 	if abs == "" {
 		return false
