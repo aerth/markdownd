@@ -40,30 +40,22 @@ import (
 	"github.com/russross/blackfriday"
 )
 
+// flags
 var (
 	addr      = flag.String("http", ":8080", "address to listen on")
 	logfile   = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
 	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
 )
 
+// markdown server
 type Server struct {
-	Root       http.FileSystem
-	RootString string
+	Root       http.FileSystem // directory to serve
+	RootString string          // keep directory name for comparing prefix
 }
 
-const version = "0.0.6"
+const version = "0.0.7"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
-
-func init() {
-	flag.Usage = func() {
-		println(usage)
-		println("FLAGS")
-		flag.PrintDefaults()
-	}
-	rand.Seed(time.Now().UnixNano())
-}
-
 const usage = `
 USAGE
 
@@ -77,6 +69,17 @@ Serve current directory on port 8080, log to stderr
 Serve 'docs' directory on port 8081, log to 'md.log'
 	markdownd -log md.log -http :8081`
 
+// redefine flag Usage
+func init() {
+	flag.Usage = func() {
+		println(usage)
+		println("FLAGS")
+		flag.PrintDefaults()
+	}
+	rand.Seed(time.Now().UnixNano())
+}
+
+// markdown command
 func main() {
 	println(sig)
 	// need only 1 argument
@@ -93,6 +96,7 @@ func main() {
 	// get absolute path of flag.Arg(0)
 	dir := flag.Arg(0)
 	dir = prepareDirectory(dir)
+
 	// new server
 	srv := &Server{
 		Root:       http.Dir(dir),
@@ -102,7 +106,7 @@ func main() {
 	println("serving filesystem:", dir)
 
 	if *logfile != os.Stderr.Name() {
-		func(){
+		func() {
 			f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
 			if err != nil {
 				logger.Fatalf("cant open log file: %s", err)
@@ -113,24 +117,34 @@ func main() {
 
 	println("log output:", *logfile)
 
+	// trick to show listening port
 	go func() { <-time.After(time.Second); println("listening:", *addr) }()
 
 	// create a http server
 	server := &http.Server{
-		Addr: *addr,
-		Handler: srv,
+		Addr:     *addr,
+		Handler:  srv,
 		ErrorLog: logger,
 	}
+
+	// disable keepalives
 	server.SetKeepAlivesEnabled(false)
 
 	// start serving
 	err := server.ListenAndServe()
 
+	// print usage info, probably started wrong or port is occupied
+	flag.Usage()
+
 	// always non-nil
 	log.Println(err)
+
+	// any exit is an error
+	os.Exit(111)
 	return
 }
 
+// generate kind-of-unique string
 func rfid() string {
 	return strconv.Itoa(rand.Int())
 }
@@ -152,6 +166,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// start timing
 	t1 := time.Now()
 
 	// Add Server header
@@ -165,7 +180,6 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// abs is not absolute yet
 	abs := r.URL.Path[1:] // remove slash
-
 	if abs == "" {
 		abs = *indexPage
 	}
@@ -202,8 +216,6 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-
-
 	// check if exists, or give 404
 	_, err = os.Open(abs)
 	if err != nil {
@@ -226,6 +238,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// compare prefix (alternate way of checking symlink?)
 	// above, we checked for abs vs symlink resolved,
 	// here lets check if they have the special prefix of "s.Root"
 	// probably redundant.
@@ -248,7 +261,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// serve raw html if exists
 	if strings.HasSuffix(abs, ".html") || strings.HasPrefix(ct, "text/html") {
-		
+
 		log.Println(requestid, "serving raw html:", abs)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(b)
@@ -276,33 +289,41 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // fileisgood returns false if symlink
 // comparing absolute vs resolved path is apparently quick and effective
 func fileisgood(abs string) bool {
+
+	// sanity check
 	if abs == "" {
 		return false
 	}
 
+	// is absolute really absolute?
 	var err error
 	if !filepath.IsAbs(abs) {
 		abs, err = filepath.Abs(abs)
 	}
-
 	if err != nil {
 		println(err.Error())
 		return false
 	}
 
+	// get real path after eval symlinks
 	realpath, err := filepath.EvalSymlinks(abs)
 	if err != nil {
 		println(err.Error())
 		return false
 	}
+
+	// equality check
 	return realpath == abs
 }
 
-// prepare root filesystem directory
+// prepare root filesystem directory for serving
 func prepareDirectory(dir string) string {
+	// add slash to dot
 	if dir == "." {
 		dir += "/"
 	}
+
+	// become absolute
 	var err error
 	dir, err = filepath.Abs(dir)
 	if err != nil {
@@ -311,7 +332,7 @@ func prepareDirectory(dir string) string {
 		return err.Error()
 	}
 
-	// add trailing slash
+	// add trailing slash (for comparing prefix)
 	if !strings.HasSuffix(dir, "/") {
 		dir += "/"
 	}
