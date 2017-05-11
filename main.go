@@ -70,11 +70,17 @@ markdownd [flags] [directory]
 
 EXAMPLES
 
-Serve current directory on port 8080, log to stderr
+Serve current directory on port 8080, log to stderr:
 	markdownd -log /dev/stderr -http 127.0.0.1:8080 .
 
-Serve 'docs' directory on port 8081, log to 'md.log'
-	markdownd -log md.log -http :8081
+Serve 'docs' directory on port 8081, log to 'md.log':
+	markdownd -log md.log -http :8081 docs
+
+Serve docs with header, footer, and table of contents. Disable Logs:
+	markdownd -log none -header bar.html -footer foo.html -toc docs
+
+Serve docs only on localhost:
+	markdownd -http 127.0.0.1:8080 docs
 `
 
 // redefine flag Usage
