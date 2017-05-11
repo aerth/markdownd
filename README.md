@@ -1,6 +1,6 @@
 ![markdownd](https://github.com/aerth/markdownd/blob/master/docs/markdownd.png?raw=true)
 
-```./md <directory>```
+```./md [flags] <directory>```
 
 ## serves:
 
@@ -10,7 +10,8 @@
   * no indexing
   * no symlinks
   * no `../` paths
-  * raw markdown ( example: GET /index.md?raw )
+  * raw markdown requests ( example: `GET /index.md?raw` )
+  * custom index page (use flag: `-index README.md`)
 
 ## docker
 
