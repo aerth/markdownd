@@ -42,12 +42,12 @@ import (
 
 // flags
 var (
-	addr      = flag.String("http", ":8080", "address to listen on")
+	addr      = flag.String("http", ":8080", "address to listen on format 'address:port',\n\tif address is omitted will listen on all interfaces")
 	logfile   = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
-	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
-	header    = flag.String("header", "", "html header for markdown requests")
-	footer    = flag.String("footer", "", "html footer for markdown requests")
-	toc = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
+	indexPage = flag.String("index", "index.md", "filename to use for paths ending in '/',\n\ttry something like '-index=README.md'")
+	header    = flag.String("header", "", "html header filename for markdown requests")
+	footer    = flag.String("footer", "", "html footer filename for markdown requests")
+	toc       = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
 )
 
 // log to file
@@ -114,20 +114,11 @@ func serve(args []string) {
 
 	println("serving filesystem:", dir)
 
-	if *logfile != os.Stderr.Name() {
-		func() {
-			f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
-			if err != nil {
-				logger.Fatalf("cant open log file: %s", err)
-			}
-			logger.SetOutput(f)
-		}()
-	}
-
+	openLogFile()
 	println("log output:", *logfile)
 
 	if *header != "" {
-		println("header:", *header)
+		println("html header:", *header)
 		b, err := ioutil.ReadFile(*header)
 		if err != nil {
 			println(err.Error())
@@ -139,7 +130,7 @@ func serve(args []string) {
 	}
 
 	if *footer != "" {
-		println("footer:", *footer)
+		println("html footer:", *footer)
 		b, err := ioutil.ReadFile(*footer)
 		if err != nil {
 			println(err.Error())
@@ -150,14 +141,14 @@ func serve(args []string) {
 
 	// create a http server
 	server := &http.Server{
-		Addr:     *addr,
-		Handler:  srv,
-		ErrorLog: logger,
-		MaxHeaderBytes: 1 << 10, // 1KB
-		ReadTimeout: time.Second,
-		WriteTimeout: time.Second,
-		ReadHeaderTimeout: time.Second,
-		IdleTimeout: time.Second,
+		Addr:              *addr,
+		Handler:           srv,
+		ErrorLog:          logger,
+		MaxHeaderBytes:    (1 << 10), // 1KB
+		ReadTimeout:       (time.Second * 5),
+		WriteTimeout:      (time.Second * 5),
+		ReadHeaderTimeout: (time.Second * 5),
+		IdleTimeout:       (time.Second * 5),
 	}
 
 	// disable keepalives
@@ -395,10 +386,35 @@ func Markdown(in []byte) []byte {
 	}
 	md := blackfriday.Markdown(
 		in, blackfriday.HtmlRenderer(
-		// html flags
-		flags,
+			// html flags
+			flags,
 			"", ""),
 		// extensions
-	  	0)
+		0)
 	return md
+}
+
+// use logfile flag and set logger Logger
+func openLogFile() {
+	switch *logfile {
+	case os.Stderr.Name(), "stderr":
+		// already stderr
+		*logfile = os.Stderr.Name()
+	case os.Stdout.Name(), "stdout":
+		logger.SetOutput(os.Stdout)
+		*logfile = os.Stdout.Name()
+	case "none", "no", "null", "/dev/null", "nil", "disabled":
+		logger.SetOutput(ioutil.Discard)
+		*logfile = os.DevNull
+	default:
+		func() {
+			logger.Printf("Opening log file: %q", *logfile)
+			f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0660)
+			if err != nil {
+				logger.Fatalf("cant open log file: %s", err)
+			}
+			logger.SetOutput(f)
+		}()
+	}
+
 }
