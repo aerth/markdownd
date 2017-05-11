@@ -50,6 +50,9 @@ var (
 	toc = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
 )
 
+// log to file
+var logger = log.New(os.Stderr, "", 0)
+
 // markdown server
 type Server struct {
 	Root           http.FileSystem // directory to serve
@@ -98,8 +101,6 @@ func serve(args []string) {
 		os.Exit(111)
 		return
 	}
-
-	logger := log.New(os.Stderr, "", 0)
 
 	// get absolute path of flag.Arg(0)
 	dir := flag.Arg(0)
@@ -152,6 +153,11 @@ func serve(args []string) {
 		Addr:     *addr,
 		Handler:  srv,
 		ErrorLog: logger,
+		MaxHeaderBytes: 1 << 10, // 1KB
+		ReadTimeout: time.Second,
+		WriteTimeout: time.Second,
+		ReadHeaderTimeout: time.Second,
+		IdleTimeout: time.Second,
 	}
 
 	// disable keepalives
@@ -160,6 +166,9 @@ func serve(args []string) {
 	// trick to show listening port
 	go func() { <-time.After(time.Second); println("listening:", *addr) }()
 
+	// add date+time to log entries
+	logger.SetFlags(log.LstdFlags)
+
 	// start serving
 	err := server.ListenAndServe()
 
@@ -167,7 +176,7 @@ func serve(args []string) {
 	flag.Usage()
 
 	// always non-nil
-	log.Println(err)
+	logger.Println(err)
 
 	// any exit is an error
 	os.Exit(111)
@@ -182,14 +191,14 @@ func rfid() string {
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// all we want is GET
 	if r.Method != "GET" {
-		log.Println("bad method:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		logger.Println("bad method:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.NotFound(w, r)
 		return
 	}
 
 	// deny requests containing '../'
 	if strings.Contains(r.URL.Path, "../") {
-		log.Println("bad path:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		logger.Println("bad path:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.NotFound(w, r)
 		return
 	}
@@ -221,15 +230,15 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	abs = s.RootString + abs
 
 	// log now that we have filename
-	log.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
+	logger.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
 
 	// log how long this takes
-	defer log.Println(requestid, "closed after", time.Now().Sub(t1))
+	defer logger.Println(requestid, "closed after", time.Now().Sub(t1))
 
 	// get absolute path of requested file (could not exist)
 	abs, err := filepath.Abs(abs)
 	if err != nil {
-		log.Println(requestid, "error resolving absolute path:", err)
+		logger.Println(requestid, "error resolving absolute path:", err)
 		http.NotFound(w, r)
 		return
 	}
@@ -239,7 +248,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		trymd := strings.TrimSuffix(abs, ".html") + ".md"
 		_, err := os.Open(trymd)
 		if err == nil {
-			log.Println(requestid, abs, "->", trymd)
+			logger.Println(requestid, abs, "->", trymd)
 			abs = trymd
 		}
 	}
@@ -248,20 +257,20 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, err = os.Open(abs)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file") {
-			log.Println(requestid, "404", abs)
+			logger.Println(requestid, "404", abs)
 			http.NotFound(w, r)
 			return
 		}
 
 		// probably permissions
-		log.Println(requestid, "error opening file:", err, abs)
+		logger.Println(requestid, "error opening file:", err, abs)
 		http.NotFound(w, r)
 		return
 	}
 
 	// check if symlink ( to avoid /proc/self/root style attacks )
 	if !fileisgood(abs) {
-		log.Printf("%s error: %q is symlink. serving 404", requestid, abs)
+		logger.Printf("%s error: %q is symlink. serving 404", requestid, abs)
 		http.NotFound(w, r)
 		return
 	}
@@ -271,7 +280,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// here lets check if they have the special prefix of "s.Root"
 	// probably redundant.
 	if !strings.HasPrefix(abs, s.RootString) {
-		log.Println(requestid, "bad path", abs, "doesnt have prefix:", s.RootString)
+		logger.Println(requestid, "bad path", abs, "doesnt have prefix:", s.RootString)
 		http.NotFound(w, r)
 		return
 	}
@@ -279,7 +288,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// read bytes (for detecting content type )
 	b, err := ioutil.ReadFile(abs)
 	if err != nil {
-		log.Printf("%s error reading file: %q", requestid, abs)
+		logger.Printf("%s error reading file: %q", requestid, abs)
 		http.NotFound(w, r)
 		return
 	}
@@ -289,7 +298,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// serve raw html if exists
 	if strings.HasSuffix(abs, ".html") && strings.HasPrefix(ct, "text/html") {
-		log.Println(requestid, "serving raw html:", abs)
+		logger.Println(requestid, "serving raw html:", abs)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(b)
 		return
@@ -298,11 +307,11 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// probably markdown
 	if strings.HasSuffix(abs, ".md") && strings.HasPrefix(ct, "text/plain") {
 		if strings.Contains(r.URL.RawQuery, "raw") {
-			log.Println(requestid, "raw markdown request:", abs)
+			logger.Println(requestid, "raw markdown request:", abs)
 			w.Write(b)
 			return
 		}
-		log.Println(requestid, "serving markdown:", abs)
+		logger.Println(requestid, "serving markdown:", abs)
 
 		md := Markdown(b)
 		if md == nil {
@@ -317,7 +326,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// fallthrough with http.ServeFile
-	log.Printf("%s serving %s: %s", requestid, ct, abs)
+	logger.Printf("%s serving %s: %s", requestid, ct, abs)
 
 	http.ServeFile(w, r, abs)
 }
