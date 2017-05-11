@@ -84,7 +84,10 @@ func main() {
 	println(sig)
 	// need only 1 argument
 	flag.Parse()
-	args := flag.Args()
+	serve(flag.Args())
+}
+
+func serve(args []string) {
 	if len(args) != 1 {
 		println(usage)
 		os.Exit(111)
@@ -186,7 +189,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// / suffix, add *index.Page
 	if strings.HasSuffix(abs, "/") {
-		abs += "index.md"
+		abs += *indexPage
 	}
 
 	// prepend root directory to filesrc
