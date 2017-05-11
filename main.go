@@ -45,15 +45,19 @@ var (
 	addr      = flag.String("http", ":8080", "address to listen on")
 	logfile   = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
 	indexPage = flag.String("index", "index.md", "page to use for paths ending in '/'")
+	header    = flag.String("header", "", "html header for markdown requests")
+	footer    = flag.String("footer", "", "html footer for markdown requests")
+	toc = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
 )
 
 // markdown server
 type Server struct {
-	Root       http.FileSystem // directory to serve
-	RootString string          // keep directory name for comparing prefix
+	Root           http.FileSystem // directory to serve
+	RootString     string          // keep directory name for comparing prefix
+	header, footer []byte          // for not-raw markdown requests
 }
 
-const version = "0.0.7"
+const version = "0.0.8"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
@@ -67,7 +71,8 @@ Serve current directory on port 8080, log to stderr
 	markdownd -log /dev/stderr -http 127.0.0.1:8080 .
 
 Serve 'docs' directory on port 8081, log to 'md.log'
-	markdownd -log md.log -http :8081`
+	markdownd -log md.log -http :8081
+`
 
 // redefine flag Usage
 func init() {
@@ -89,7 +94,7 @@ func main() {
 
 func serve(args []string) {
 	if len(args) != 1 {
-		println(usage)
+		flag.Usage()
 		os.Exit(111)
 		return
 	}
@@ -120,8 +125,27 @@ func serve(args []string) {
 
 	println("log output:", *logfile)
 
-	// trick to show listening port
-	go func() { <-time.After(time.Second); println("listening:", *addr) }()
+	if *header != "" {
+		println("header:", *header)
+		b, err := ioutil.ReadFile(*header)
+		if err != nil {
+			println(err.Error())
+			os.Exit(111)
+		}
+		srv.header = b
+	} else {
+		srv.header = []byte("<!DOCTYPE html>\n")
+	}
+
+	if *footer != "" {
+		println("footer:", *footer)
+		b, err := ioutil.ReadFile(*footer)
+		if err != nil {
+			println(err.Error())
+			os.Exit(111)
+		}
+		srv.footer = b
+	}
 
 	// create a http server
 	server := &http.Server{
@@ -132,6 +156,9 @@ func serve(args []string) {
 
 	// disable keepalives
 	server.SetKeepAlivesEnabled(false)
+
+	// trick to show listening port
+	go func() { <-time.After(time.Second); println("listening:", *addr) }()
 
 	// start serving
 	err := server.ListenAndServe()
@@ -153,8 +180,6 @@ func rfid() string {
 }
 
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r.Body.Close()
-
 	// all we want is GET
 	if r.Method != "GET" {
 		log.Println("bad method:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
@@ -187,7 +212,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		abs = *indexPage
 	}
 
-	// / suffix, add *index.Page
+	// '/' suffix, add *index.Page
 	if strings.HasSuffix(abs, "/") {
 		abs += *indexPage
 	}
@@ -263,8 +288,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ct := http.DetectContentType(b)
 
 	// serve raw html if exists
-	if strings.HasSuffix(abs, ".html") || strings.HasPrefix(ct, "text/html") {
-
+	if strings.HasSuffix(abs, ".html") && strings.HasPrefix(ct, "text/html") {
 		log.Println(requestid, "serving raw html:", abs)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(b)
@@ -279,7 +303,16 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Println(requestid, "serving markdown:", abs)
-		w.Write(blackfriday.MarkdownCommon(b))
+
+		md := Markdown(b)
+		if md == nil {
+			w.WriteHeader(200)
+			return
+		}
+		w.Header().Add("Content-Type", "text/html")
+		w.Write(s.header)
+		w.Write(md)
+		w.Write(s.footer)
 		return
 	}
 
@@ -341,4 +374,22 @@ func prepareDirectory(dir string) string {
 	}
 
 	return dir
+}
+
+func Markdown(in []byte) []byte {
+	if len(in) == 0 {
+		return nil
+	}
+	flags := 0
+	if *toc {
+		flags |= blackfriday.HTML_TOC
+	}
+	md := blackfriday.Markdown(
+		in, blackfriday.HtmlRenderer(
+		// html flags
+		flags,
+			"", ""),
+		// extensions
+	  	0)
+	return md
 }
