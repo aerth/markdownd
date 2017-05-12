@@ -112,3 +112,31 @@ func TestHTMLHeaderFooter(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func sendRequest(req *http.Request) *http.Response {
+		dir := prepareDirectory("docs")
+		w := httptest.NewRecorder()
+		h := &Handler{
+			Root:       http.Dir(dir),
+			RootString: dir,
+		}
+		h.ServeHTTP(w, req)
+		resp := w.Result()
+
+		return resp
+	
+}
+
+func TestBadMethods(t *testing.T){
+methods := []string{"POST", "PUT", "DELETE", "HEAD", 
+	"OPTIONS", "TRACE", "CONNECT", "DUMMY"}
+for _, method := range methods {
+			req, _ := http.NewRequest(method, "/", nil)		
+			resp := sendRequest(req)
+			if resp.StatusCode != 404 {
+				t.Log("Expected 404, got:", resp.StatusCode)
+				t.FailNow()
+			}
+
+}
+}
