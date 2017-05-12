@@ -208,7 +208,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// start timing
 	t1 := time.Now()
-
+	
 	// Add Server header
 	w.Header().Add("Server", serverheader)
 
@@ -217,6 +217,11 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// generate unique request id
 	requestid := rfid()
+
+	// log how long this takes
+	defer func(t func() time.Time) {
+		logger.Println(requestid, "closed after", t().Sub(t1))
+	}(time.Now)
 
 	// abs is not absolute yet
 	abs := r.URL.Path[1:] // remove slash
@@ -235,9 +240,6 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// log now that we have filename
 	logger.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
 
-	// log how long this takes
-	defer func() { logger.Println(requestid, "closed after", time.Now().Sub(t1)) }()
-
 	// get absolute path of requested file (could not exist)
 	abs, err := filepath.Abs(abs)
 	if err != nil {
@@ -246,7 +248,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// .html suffix
+	// .html suffix, but .md exists. choose to serve .md over .html
 	if strings.HasSuffix(abs, ".html") {
 		trymd := strings.TrimSuffix(abs, ".html") + ".md"
 		_, err := os.Open(trymd)
