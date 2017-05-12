@@ -234,7 +234,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		abs += *indexPage
 	}
 
-	// prepend root directory to filesrc
+	// still not absolute, prepend root directory to filesrc
 	abs = h.RootString + abs
 
 	// log now that we have filename
