@@ -86,7 +86,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-// markdown handler
+// Handler handles markdown requests
 type Handler struct {
 	Root           http.FileSystem // directory to serve
 	RootString     string          // keep directory name for comparing prefix
@@ -316,7 +316,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		logger.Println(requestid, "serving markdown:", abs)
 
-		md := Markdown(b)
+		md := markdown2html(b)
 		if md == nil {
 			w.WriteHeader(200)
 			return
@@ -388,7 +388,7 @@ func prepareDirectory(dir string) string {
 	return dir
 }
 
-func Markdown(in []byte) []byte {
+func markdown2html(in []byte) []byte {
 	if len(in) == 0 {
 		return nil
 	}
