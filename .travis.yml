@@ -2,5 +2,8 @@ language: go
 go:
   - 1.8.1
   - master
-
 install: make
+script:
+  - go test -i -race ./...
+  - go test -v -race ./...
+ 
