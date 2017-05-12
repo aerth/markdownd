@@ -4,6 +4,9 @@
 
 `./markdownd -toc -header theme/header.html -footer theme/footer.html .`
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/aerth/markdownd)](https://goreportcard.com/report/github.com/aerth/markdownd) 
+[![Build Status](https://travis-ci.org/aerth/markdownd.svg?branch=master)](https://travis-ci.org/aerth/markdownd) 
+
 ## serves:
 
   * tries markdown file (.md) in .html request (/index.html tries /index.md first)
