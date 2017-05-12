@@ -22,7 +22,7 @@
 * SOFTWARE.
  */
 
-// Command markdownd serves markdown, static, and html files.
+// The markdownd command serves markdown, static, and html files.
 package main
 
 import (
