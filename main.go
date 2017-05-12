@@ -208,7 +208,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// start timing
 	t1 := time.Now()
-	
+
 	// Add Server header
 	w.Header().Add("Server", serverheader)
 
