@@ -53,14 +53,7 @@ var (
 // log to file
 var logger = log.New(os.Stderr, "", 0)
 
-// markdown server
-type Server struct {
-	Root           http.FileSystem // directory to serve
-	RootString     string          // keep directory name for comparing prefix
-	header, footer []byte          // for not-raw markdown requests
-}
-
-const version = "0.0.8"
+const version = "0.0.9"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
@@ -93,15 +86,22 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// markdown handler
+type Handler struct {
+	Root           http.FileSystem // directory to serve
+	RootString     string          // keep directory name for comparing prefix
+	header, footer []byte          // for not-raw markdown requests
+}
+
 // markdown command
 func main() {
 	println(sig)
-	// need only 1 argument
 	flag.Parse()
 	serve(flag.Args())
 }
 
 func serve(args []string) {
+	// need only 1 argument, the directory to serve
 	if len(args) != 1 {
 		flag.Usage()
 		os.Exit(111)
@@ -112,16 +112,23 @@ func serve(args []string) {
 	dir := flag.Arg(0)
 	dir = prepareDirectory(dir)
 
-	// new server
-	srv := &Server{
+	_, err := os.Stat(dir + *indexPage)
+	if err != nil {
+		logger.Printf("warning: %q not found, did you forget '-index' flag?", *indexPage)
+	}
+
+	// new markdown handler
+	h := &Handler{
 		Root:       http.Dir(dir),
 		RootString: dir,
 	}
 
+	// print absolute directory we are serving
 	println("serving filesystem:", dir)
 
+	// take care of opening log file
 	openLogFile()
-	println("log output:", *logfile)
+	println("logging to:", *logfile)
 
 	if *header != "" {
 		println("html header:", *header)
@@ -130,9 +137,9 @@ func serve(args []string) {
 			println(err.Error())
 			os.Exit(111)
 		}
-		srv.header = b
+		h.header = b
 	} else {
-		srv.header = []byte("<!DOCTYPE html>\n")
+		h.header = []byte("<!DOCTYPE html>\n")
 	}
 
 	if *footer != "" {
@@ -142,13 +149,13 @@ func serve(args []string) {
 			println(err.Error())
 			os.Exit(111)
 		}
-		srv.footer = b
+		h.footer = b
 	}
 
 	// create a http server
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           srv,
+		Handler:           h,
 		ErrorLog:          logger,
 		MaxHeaderBytes:    (1 << 10), // 1KB
 		ReadTimeout:       (time.Second * 5),
@@ -167,7 +174,7 @@ func serve(args []string) {
 	logger.SetFlags(log.LstdFlags)
 
 	// start serving
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 
 	// print usage info, probably started wrong or port is occupied
 	flag.Usage()
@@ -177,7 +184,6 @@ func serve(args []string) {
 
 	// any exit is an error
 	os.Exit(111)
-	return
 }
 
 // generate kind-of-unique string
@@ -185,7 +191,7 @@ func rfid() string {
 	return strconv.Itoa(rand.Int())
 }
 
-func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// all we want is GET
 	if r.Method != "GET" {
 		logger.Println("bad method:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
@@ -224,13 +230,13 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// prepend root directory to filesrc
-	abs = s.RootString + abs
+	abs = h.RootString + abs
 
 	// log now that we have filename
 	logger.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
 
 	// log how long this takes
-	defer logger.Println(requestid, "closed after", time.Now().Sub(t1))
+	defer func() { logger.Println(requestid, "closed after", time.Now().Sub(t1)) }()
 
 	// get absolute path of requested file (could not exist)
 	abs, err := filepath.Abs(abs)
@@ -276,8 +282,8 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// above, we checked for abs vs symlink resolved,
 	// here lets check if they have the special prefix of "s.Root"
 	// probably redundant.
-	if !strings.HasPrefix(abs, s.RootString) {
-		logger.Println(requestid, "bad path", abs, "doesnt have prefix:", s.RootString)
+	if !strings.HasPrefix(abs, h.RootString) {
+		logger.Println(requestid, "bad path", abs, "doesnt have prefix:", h.RootString)
 		http.NotFound(w, r)
 		return
 	}
@@ -316,9 +322,9 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Add("Content-Type", "text/html")
-		w.Write(s.header)
+		w.Write(h.header)
 		w.Write(md)
-		w.Write(s.footer)
+		w.Write(h.footer)
 		return
 	}
 

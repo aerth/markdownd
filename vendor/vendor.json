@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "vRybmCalKWlCggSQjMfBvxq+qwU=",
+			"path": "github.com/aerth/markdownd",
+			"revision": "def58f483c4cc3a065cdc3fe3bb865d6796ee844",
+			"revisionTime": "2017-05-11T18:21:04Z"
+		},
+		{
 			"checksumSHA1": "MnRnniTE94p6DieveIFQxx3PArg=",
 			"path": "github.com/russross/blackfriday",
 			"revision": "0ba0f2b6ed7c475a92e4df8641825cb7a11d1fa3",
