@@ -1,25 +1,70 @@
 #!/bin/bash
 set -e
+GRN="\e[32m"
+RED="\e[31m"
+RST="\e[0m"
+
+# check for recent go, and grab includes
+check_deps(){
+	# need go
+	if [ -z "$(which go)" ]; then
+		echo need latest go, grab from https://golang.org
+		exit 111
+	fi
+
+	# check go version, warn if out dated
+	GOVERSION=$(go version)
+	if [  -z "$(echo "$GOVERSION" | grep "go1.8.1")" ]; then
+		printf 'Using unsupported version of go compiler: '
+		GOVERSION="$RED""$GOVERSION""$RST"
+	else
+		GOVERSION="$GRN""$GOVERSION""$RST"
+	fi
+	printf "$GOVERSION\n"
+
+	# get latest deps if they dont exist
+	echo "getting dependencies if they don't exist in "'$GOPATH'
+	go get -d -v .
+	}
+
 
 # build static binary
 
 ## make building faster (for development only)
 # env CGO_ENABLED=0 go install -v
 
-## ignore vendor dir
+
 build(){	
-	echo moving vendor dir to vendor.mv && echo
-	mv -nvi vendor vendor.mv || true
-	echo
-	echo building static binary && echo
-	env CGO_ENABLED=0 go build -v -x -ldflags='-s -w' -o markdownd
-	echo
-	echo putting back vendor dir
-	mv -nvi vendor.mv vendor
+
+	if [ -d "vendor" ]; then
+		## ignore vendor dir
+		echo moving vendor dir to vendor.mv && echo
+		mv -nvi vendor vendor.mv
+	fi
+	check_deps
+	echo building static binary
+	time env CGO_ENABLED=0 go build -x -v -ldflags='-s -w' -o markdownd
+	EXITCODE=$?
+	FILESIZE=$(ls -sh markdownd)
+	printf "filesize: $FILESIZE\n"
+
+	if [ -x "$(which file)" ]; then
+		file markdownd
+	fi
+	if [ -x "$(which sha256sum)" ]; then
+		printf "calculating sha256... "
+		sha256sum markdownd
+	fi
+	if [ -d "vendor.mv" ]; then
+		echo putting back vendor dir
+		mv -nvi vendor.mv vendor
+	fi
+	echo exit $EXITCODE
+	exit $EXITCODE
 }
 
 if [ -z "$@" ]; then 
-build && echo "successfully built static binary: markdownd" && \
+build && printf "$GRN**** SUCCESS ****$RST\n" && \
 exit 0
 fi
 
