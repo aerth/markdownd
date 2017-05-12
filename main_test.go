@@ -4,6 +4,9 @@ import (
 	"testing"
 )
 
-func TestDummy(t *testing.T) {
-	t.FailNow()
+func TestPrepareDirectory(t *testing.T) {
+	dir := "docs"
+	if prepareDirectory(dir) == "docs" {
+		t.FailNow()
+	}
 }
