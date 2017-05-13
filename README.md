@@ -54,10 +54,8 @@ example launch code, modify `$PWD/docs` and `8888` to suit your needs
 ## contributing:
 
   * pull requests welcome
-  * bugs/issues very welcome
-  * header/footer?
-  * templates?
-  * rate limiting / preventing abuse?
+  * bugs/issues/features very welcome
+  * please 'gofmt -w -l -s' before commits
 
 ## logging:
 
