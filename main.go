@@ -370,7 +370,7 @@ func fileisgood(abs string) bool {
 func prepareDirectory(dir string) string {
 	// add slash to dot
 	if dir == "." {
-		dir += "/"
+		dir += string(os.PathSeparator)
 	}
 
 	// become absolute
@@ -383,8 +383,8 @@ func prepareDirectory(dir string) string {
 	}
 
 	// add trailing slash (for comparing prefix)
-	if !strings.HasSuffix(dir, "/") {
-		dir += "/"
+	if !strings.HasSuffix(dir, string(os.PathSeparator)) {
+		dir += string(os.PathSeparator)
 	}
 
 	return dir
