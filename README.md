@@ -1,6 +1,6 @@
 ![markdownd](https://github.com/aerth/markdownd/blob/master/docs/markdownd.png?raw=true)
 
-`./md [flags] <directory>`
+`./markdownd [flags] <directory>`
 
 `./markdownd -toc -header theme/header.html -footer theme/footer.html .`
 
