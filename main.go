@@ -53,7 +53,7 @@ var (
 // log to file
 var logger = log.New(os.Stderr, "", 0)
 
-const version = "0.0.9"
+const version = "0.0.10"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
