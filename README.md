@@ -20,6 +20,18 @@
   * generates table of contents with `-toc` flag
   * themed html with `-header` and `-footer` flag
 
+## installation
+
+### Compile using Go
+
+    go get -d -v github.com/aerth/markdownd
+    cd $(go env GOPATH)/src/github.com/aerth/markdownd
+    ./build.sh
+
+### Download binary for your OS
+
+[Latest Release](https://github.com/aerth/markdownd/releases/latest)
+
 ## docker
 
 example launch code, modify `$PWD/docs` and `8888` to suit your needs
