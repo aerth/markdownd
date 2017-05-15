@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 GRN="\e[32m"
 RED="\e[31m"
 RST="\e[0m"
@@ -69,6 +70,9 @@ exit 0
 fi
 
 if [ "package" == "$1" ]; then
+
+set -x
+set -e
 # make sure we are in go package
 if [ -z "$(ls *go)" ]; then
         echo not a go package
@@ -87,17 +91,20 @@ cd pkg && sha256sum * > ../SHA256.txt; cd $RWD;
 
 # package each file in 'pkg' dir
 for i in $(ls pkg); do
-        echo Packaging $i; 
-        mkdir -p $i; 
-        cp pkg/$i $i/$i; 
-        cp README.md $i/; 
-        cp LICENSE $i/; 
-        cp -avx docs $i/; 
+        echo Packaging $i;
+        mkdir -p $i;
+        cp pkg/$i $i/$i;
+        cp README.md $i/;
+        cp CHANGELOG.md $i/;
+        cp LICENSE $i/;
+        cp -avx docs $i/;
+        cp -avx theme $i/;
         mkdir -p $i/src; 
-        cp *.go $i/src/; 
+        cp *.go $i/src/;
+        cp build.sh $i/src/;
         cp SHA256.txt $i/;
         zip -r $i.zip $i/;
-        tar czf $i.tar.gz $i; 
+        tar czvf $i.tar.gz $i;
         rm -rvf $i;
 done
 exit 0
