@@ -15,7 +15,7 @@ check_deps(){
 
 	# check go version, warn if out dated
 	GOVERSION=$(go version)
-	if [  -z "$(echo "$GOVERSION" | grep "go1.8.1")" ]; then
+	if [  -z "$(echo "$GOVERSION" | grep "go1.8")" ]; then
 		printf 'Using unsupported version of go compiler: '
 		GOVERSION="$RED""$GOVERSION""$RST"
 	else

@@ -7,4 +7,13 @@
   * [textfile](text.txt) is a plaintext file
   * [raw](index.md?raw) is raw markdown
   * [404](notafile) is not a file, returns 404
+
+
+    package main
+    
+    func main(){
+    	println("now with syntax highlighting")
+    }
+    
+
  

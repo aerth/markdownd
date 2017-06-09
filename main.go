@@ -38,16 +38,20 @@ import (
 	"time"
 
 	"github.com/russross/blackfriday"
+	"github.com/shurcool/github_flavored_markdown"
+	"github.com/sourcegraph/syntaxhighlight"
 )
 
 // flags
 var (
-	addr      = flag.String("http", ":8080", "address to listen on format 'address:port',\n\tif address is omitted will listen on all interfaces")
-	logfile   = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
-	indexPage = flag.String("index", "index.md", "filename to use for paths ending in '/',\n\ttry something like '-index=README.md'")
-	header    = flag.String("header", "", "html header filename for markdown requests")
-	footer    = flag.String("footer", "", "html footer filename for markdown requests")
-	toc       = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
+	addr          = flag.String("http", ":8080", "address to listen on format 'address:port',\n\tif address is omitted will listen on all interfaces")
+	logfile       = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
+	indexPage     = flag.String("index", "index.md", "filename to use for paths ending in '/',\n\ttry something like '-index=README.md'")
+	header        = flag.String("header", "", "html header filename for markdown requests")
+	footer        = flag.String("footer", "", "html footer filename for markdown requests")
+	toc           = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
+	plain         = flag.Bool("plain", false, "disable github flavored markdown")
+	syntaxEnabled = flag.Bool("syntax", false, "highlight syntax in .html")
 )
 
 // log to file
@@ -118,11 +122,13 @@ func serve(args []string) {
 	}
 
 	// new markdown handler
-	h := &Handler{
+	mdhandler := &Handler{
 		Root:       http.Dir(dir),
 		RootString: dir,
 	}
 
+	h := http.DefaultServeMux
+	h.Handle("/", mdhandler)
 	// print absolute directory we are serving
 	println("serving filesystem:", dir)
 
@@ -137,9 +143,9 @@ func serve(args []string) {
 			println(err.Error())
 			os.Exit(111)
 		}
-		h.header = b
+		mdhandler.header = b
 	} else {
-		h.header = []byte("<!DOCTYPE html>\n")
+		mdhandler.header = []byte("<!DOCTYPE html>\n")
 	}
 
 	if *footer != "" {
@@ -149,7 +155,7 @@ func serve(args []string) {
 			println(err.Error())
 			os.Exit(111)
 		}
-		h.footer = b
+		mdhandler.footer = b
 	}
 
 	// create a http server
@@ -394,18 +400,23 @@ func markdown2html(in []byte) []byte {
 	if len(in) == 0 {
 		return nil
 	}
-	flags := 0
-	if *toc {
-		flags |= blackfriday.HTML_TOC
+	if *plain {
+		// default flags
+		flags := 0
+		if *toc {
+			flags |= blackfriday.HTML_TOC
+		}
+		md := blackfriday.Markdown(
+			in, blackfriday.HtmlRenderer(
+				// html flags
+				flags,
+				"", ""),
+			// extensions
+			0)
+		return md
 	}
-	md := blackfriday.Markdown(
-		in, blackfriday.HtmlRenderer(
-			// html flags
-			flags,
-			"", ""),
-		// extensions
-		0)
-	return md
+
+	return github_flavored_markdown.Markdown(in)
 }
 
 // use logfile flag and set logger Logger
@@ -431,4 +442,13 @@ func openLogFile() {
 		}()
 	}
 
+}
+
+func highlightSyntaxHTML(in []byte) (out []byte) {
+	out, err := syntaxhighlight.AsHTML(in)
+	if err != nil {
+		logger.Println("error highlighting syntax:", err)
+		return in
+	}
+	return out
 }

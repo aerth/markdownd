@@ -19,6 +19,7 @@
   * custom index page (use flag: `-index README.md`)
   * generates table of contents with `-toc` flag
   * themed html with `-header` and `-footer` flag
+  * now with syntax highlighting (use flag: `-syntax`)
 
 ## installation
 
