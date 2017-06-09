@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 GRN="\e[32m"
 RED="\e[31m"
 RST="\e[0m"
@@ -44,7 +43,7 @@ build(){
 	fi
 	check_deps
 	echo building static binary
-	time env CGO_ENABLED=0 go build -x -v -ldflags='-s -w' -o markdownd
+	time env CGO_ENABLED=0 go build -v -ldflags='-s -w' -o markdownd && echo "built 'markdownd'"
 	EXITCODE=$?
 	FILESIZE=$(ls -sh markdownd)
 	printf "filesize: $FILESIZE\n"
