@@ -27,6 +27,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -57,7 +58,7 @@ var (
 // log to file
 var logger = log.New(os.Stderr, "", 0)
 
-const version = "0.0.10"
+const version = "0.0.11"
 const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
@@ -78,14 +79,35 @@ Serve docs with header, footer, and table of contents. Disable Logs:
 
 Serve docs only on localhost:
 	markdownd -http 127.0.0.1:8080 docs
+FLAGS
+
+  -footer string
+        html footer filename for markdown requests
+  -header string
+        html header filename for markdown requests
+  -http string
+        address to listen on format 'address:port',
+        if address is omitted will listen on all interfaces (default ":8080")
+  -index string
+        filename to use for paths ending in '/',
+        try something like '-index=README.md' (default "index.md")
+  -log string
+        redirect logs to this file (default "/dev/stderr")
+  -plain
+        disable github flavored markdown
+  -syntax
+        highlight syntax in .html
+  -toc
+        generate table of contents at the top of each markdown page
+
 `
 
 // redefine flag Usage
 func init() {
 	flag.Usage = func() {
-		println(usage)
-		println("FLAGS")
-		flag.PrintDefaults()
+		fmt.Println(usage)
+		//fmt.Println("FLAGS")
+		//flag.PrintDefaults()
 	}
 	rand.Seed(time.Now().UnixNano())
 }
@@ -99,7 +121,7 @@ type Handler struct {
 
 // markdown command
 func main() {
-	println(sig)
+	fmt.Println(sig)
 	flag.Parse()
 	serve(flag.Args())
 }
