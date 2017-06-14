@@ -3,12 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "vRybmCalKWlCggSQjMfBvxq+qwU=",
-			"path": "github.com/aerth/markdownd",
-			"revision": "def58f483c4cc3a065cdc3fe3bb865d6796ee844",
-			"revisionTime": "2017-05-11T18:21:04Z"
-		},
-		{
 			"checksumSHA1": "DWtoL5LzvhxQ6LuchRPoSbsNhp4=",
 			"path": "github.com/microcosm-cc/bluemonday",
 			"revision": "e79763773ab6222ca1d5a7cbd9d62d83c1f77081",
