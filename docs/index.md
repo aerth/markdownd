@@ -1,4 +1,4 @@
-[![markdown](markdownd.png)](https://github.com/aerth/markdownd)
+[![markdown](/markdownd.png)](https://markdownd.herokuapp.com)
 
 # welcome to markdownd
  
