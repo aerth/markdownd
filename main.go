@@ -228,9 +228,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func(t func() time.Time) {
 		logger.Println(requestid, "closed after", t().Sub(t1))
 	}(time.Now)
-	log.Println(r.URL.Path, "/gh.css???")
-	if r.URL.Path == "/gh.css" {
-		log.Println("CSS")
+
+	if *syntaxEnabled && r.URL.Path == "/gh.css" {
 		b, err := Asset("static/gh.css")
 		if err == nil {
 			w.Header().Add("Content-Type", "test/css")
