@@ -232,7 +232,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *syntaxEnabled && r.URL.Path == "/gh.css" {
 		b, err := Asset("static/gh.css")
 		if err == nil {
-			w.Header().Add("Content-Type", "test/css")
+			w.Header().Add("Content-Type", "text/css")
 			w.Write(b)
 			return
 		}
