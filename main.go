@@ -34,7 +34,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -45,9 +44,9 @@ import (
 
 // flags
 var (
-	addr          = flag.String("http", ":8080", "address to listen on format 'address:port',\n\tif address is omitted will listen on all interfaces")
+	addr          = flag.String("http", "127.0.0.1:8080", "address to listen on format 'address:port',\n\tif address is omitted will listen on all interfaces")
 	logfile       = flag.String("log", os.Stderr.Name(), "redirect logs to this file")
-	indexPage     = flag.String("index", "index.md", "filename to use for paths ending in '/',\n\ttry something like '-index=README.md'")
+	indexPage     = flag.String("index", "index.md", "filename to use for paths ending in '/',\n\ttry something like '-index=README.md' or '-index=gen' to generate a simple one.")
 	header        = flag.String("header", "", "html header filename for markdown requests")
 	footer        = flag.String("footer", "", "html footer filename for markdown requests")
 	toc           = flag.Bool("toc", false, "generate table of contents at the top of each markdown page")
@@ -56,10 +55,10 @@ var (
 )
 
 // log to file
-var logger = log.New(os.Stderr, "", 0)
+var logger = log.New(os.Stderr, "[markdownd] ", log.LstdFlags)
 
-const version = "0.0.11"
-const sig = "[markdownd v" + version + "]\nhttps://github.com/aerth/markdownd"
+const version = "0.0.12"
+const sig = "[markdownd v" + version + "] https://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
 USAGE
@@ -68,8 +67,11 @@ markdownd [flags] [directory]
 
 EXAMPLES
 
-Serve current directory on port 8080, log to stderr:
-	markdownd -log /dev/stderr -http 127.0.0.1:8080 .
+Serve current directory on 127.0.0.1:8080:
+	markdownd .
+
+Serve current directory on all interfaces, port 8080, log to stderr:
+	markdownd -log /dev/stderr -http 0.0.0.0:8080 .
 
 Serve 'docs' directory on port 8081, log to 'md.log':
 	markdownd -log md.log -http :8081 docs
@@ -80,26 +82,6 @@ Serve docs with header, footer, and table of contents. Disable Logs:
 Serve docs only on localhost:
 	markdownd -http 127.0.0.1:8080 docs
 FLAGS
-
-  -footer string
-        html footer filename for markdown requests
-  -header string
-        html header filename for markdown requests
-  -http string
-        address to listen on format 'address:port',
-        if address is omitted will listen on all interfaces (default ":8080")
-  -index string
-        filename to use for paths ending in '/',
-        try something like '-index=README.md' (default "index.md")
-  -log string
-        redirect logs to this file (default "/dev/stderr")
-  -plain
-        disable github flavored markdown
-  -syntax
-        highlight syntax in .html
-  -toc
-        generate table of contents at the top of each markdown page
-
 `
 
 // redefine flag Usage
@@ -107,7 +89,7 @@ func init() {
 	flag.Usage = func() {
 		fmt.Println(usage)
 		//fmt.Println("FLAGS")
-		//flag.PrintDefaults()
+		flag.PrintDefaults()
 	}
 	rand.Seed(time.Now().UnixNano())
 }
@@ -138,9 +120,11 @@ func serve(args []string) {
 	dir := flag.Arg(0)
 	dir = prepareDirectory(dir)
 
-	_, err := os.Stat(dir + *indexPage)
-	if err != nil {
-		logger.Printf("warning: %q not found, did you forget '-index' flag?", *indexPage)
+	if *indexPage != "gen" {
+		_, err := os.Stat(dir + *indexPage)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: %q not found, did you forget '-index' flag?\n", *indexPage)
+		}
 	}
 
 	// new markdown handler
@@ -196,13 +180,10 @@ func serve(args []string) {
 	server.SetKeepAlivesEnabled(false)
 
 	// trick to show listening port
-	go func() { <-time.After(time.Second); println("listening:", *addr) }()
-
-	// add date+time to log entries
-	logger.SetFlags(log.LstdFlags)
+	go func() { <-time.After(time.Second); logger.Println("listening:", *addr) }()
 
 	// start serving
-	err = server.ListenAndServe()
+	err := server.ListenAndServe()
 
 	// print usage info, probably started wrong or port is occupied
 	flag.Usage()
@@ -216,7 +197,7 @@ func serve(args []string) {
 
 // generate kind-of-unique string
 func rfid() string {
-	return strconv.Itoa(rand.Int())
+	return fmt.Sprintf("request-%04X", rand.Intn(0xFFFF))
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -227,8 +208,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// deny requests containing '../'
-	if strings.Contains(r.URL.Path, "../") {
+	// deny requests containing '..'
+	if strings.Contains(r.URL.Path, "..") {
 		logger.Println("bad path:", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		http.NotFound(w, r)
 		return
@@ -261,18 +242,24 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// abs is not absolute yet
-	abs := r.URL.Path[1:] // remove slash
-	if abs == "" {
+	abs := r.URL.Path[1:] // remove slash prefix
+	if abs == "" && *indexPage != "gen" {
 		abs = *indexPage
 	}
 
 	// '/' suffix, add *index.Page
-	if strings.HasSuffix(abs, "/") {
+	if *indexPage != "gen" && strings.HasSuffix(abs, "/") {
 		abs += *indexPage
 	}
 
 	// still not absolute, prepend root directory to filesrc
 	abs = h.RootString + abs
+
+	if *indexPage == "gen" && strings.HasSuffix(r.URL.Path, "/") {
+		logger.Println(requestid, "generated index:", abs)
+		http.ServeFile(w, r, abs)
+		return
+	}
 
 	// log now that we have filename
 	logger.Println(requestid, r.RemoteAddr, r.Method, r.URL.Path, "->", abs)
@@ -368,7 +355,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// fallthrough with http.ServeFile
-	logger.Printf("%s serving %s: %s", requestid, ct, abs)
+	logger.Printf("%s serving %s file: %s", requestid, ct, abs)
 
 	http.ServeFile(w, r, abs)
 }
