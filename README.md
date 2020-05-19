@@ -1,49 +1,92 @@
 ![markdownd](https://github.com/aerth/markdownd/blob/master/docs/markdownd.png?raw=true)
 
-`./markdownd [flags] <directory>`
+`markdownd [flags] <directory>`
 
-`./markdownd -toc -header theme/header.html -footer theme/footer.html .`
+`markdownd -toc -header theme/header.html -footer theme/footer.html .`
+
+`markdownd -index=gen .`
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/aerth/markdownd)](https://goreportcard.com/report/github.com/aerth/markdownd) 
 [![Build Status](https://travis-ci.org/aerth/markdownd.svg?branch=master)](https://travis-ci.org/aerth/markdownd) 
 
-## serves:
+## Markdown Server
 
   * tries markdown file (.md) in .html request (/index.html tries /index.md first)
   * will serve .html if exists
   * serves static files and downloads if not .html or .md
-  * no indexing
+  * optional indexing (default: off, use -index=gen or -index=README.md)
   * no symlinks
   * no `../` paths
-  * raw markdown requests ( example: `GET /index.md?raw` )
+  * raw markdown source requests ( example: `GET /index.md?raw` )
   * custom index page (use flag: `-index README.md`)
   * generates table of contents with `-toc` flag
   * themed html with `-header` and `-footer` flag
   * now with syntax highlighting (use flag: `-syntax`)
 
-## installation
+## Usage
 
-### Compile using Go
+  * `GET /` will show a 404 unless -index flag is used (-index=gen to generate)
+  * `GET /README.md` or `GET /README.html` will process the markdown file and serve HTML.
+  * `GET /README.md?raw` will serve raw markdown source
+  * To generate index page (with links to files), use `-index=gen`
+  * To serve custom `index.md`, use `-index=index.md`
 
-    go get -d -v github.com/aerth/markdownd
-    cd $(go env GOPATH)/src/github.com/aerth/markdownd
-    ./build.sh
+#### Example use case: live preview your git repository's README.md
 
-### Download binary for your OS
+From your project repository that contains a README.md file, run markdownd like so:
+
+```
+markdownd -index=README.md .
+```
+
+And visit http://localhost:8080/ in your browser
+
+## Installation
+
+### Compile using Go (from any directory)
+
+```
+git clone https://github.com/aerth/markdownd
+cd markdownd
+make && sudo make install
+```
+
+If you don't want to install the server system-wide, or you don't have root privileges, replace last line with:
+
+```
+make && make install INSTALLDIR=$HOME/bin
+```
+
+### Or using legacy go get
+
+```
+GOFLAGS=-tags=netgo,osusergo GOBIN=$HOME/bin go get -v github.com/aerth/markdownd
+```
+
+### Download binary for your OS (old versions)
 
 [Latest Release](https://github.com/aerth/markdownd/releases/latest)
 
-## docker
+Consider installing [go](https://golang.org/dl) and building from source,
+Its fast and easy.
 
-example launch code, modify `$PWD/docs` and `8888` to suit your needs
+## Docker
 
-  * `docker run -it -v $PWD/docs:/opt -p 8888:8080 aerth/markdownd`
+When using the docker image, markdownd servest the /opt directory,
+and exposes port 8080.
 
-## free:
+You will want to share a directory into /opt and forward the port
+(using docker's `-v` and `-p` flags).
+
+For example (modify `$PWD/docs` and `8888` to suit your needs):
+
+`docker run -it -v $PWD/docs:/opt -p 8888:8080 aerth/markdownd`
+
+## Free and Open Source
 
 	The MIT License (MIT)
 	
-	Copyright (c) 2017  aerth <aerth@riseup.net>
+	Copyright (c) 2017-2020  aerth <aerth@riseup.net>
 	
 	Permission is hereby granted, free of charge, to any person obtaining a 
 	copy of this software and associated documentation files (the 
@@ -64,27 +107,8 @@ example launch code, modify `$PWD/docs` and `8888` to suit your needs
 	TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 	SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	
-## contributing:
+## Contributing:
 
   * pull requests welcome
   * bugs/issues/features very welcome
   * please 'gofmt -w -l -s' before commits
-
-## logging:
-
-	2017/05/08 14:14:05 5577006791947779410 [::1]:58338 GET / -> docs/index.md
-	2017/05/08 14:14:05 5577006791947779410 serving markdown: /home/aerth/go/src/github.com/aerth/markdownd/docs/index.md
-	2017/05/08 14:14:05 5577006791947779410 closed
-	2017/05/08 14:14:05 8674665223082153551 [::1]:58338 GET /markdownd.png -> docs/markdownd.png
-	2017/05/08 14:14:05 8674665223082153551 serving image/png: /home/aerth/go/src/github.com/aerth/markdownd/docs/markdownd.png
-	2017/05/08 14:14:05 8674665223082153551 closed
-	2017/05/08 14:14:07 6129484611666145821 [::1]:58338 GET /index.html -> docs/index.html
-	2017/05/08 14:14:07 6129484611666145821 docs/index.html -> docs/index.md
-	2017/05/08 14:14:07 6129484611666145821 serving markdown: /home/aerth/go/src/github.com/aerth/markdownd/docs/index.md
-	2017/05/08 14:14:07 6129484611666145821 closed
-	2017/05/08 14:14:08 4037200794235010051 [::1]:58338 GET /test.html -> docs/test.html
-	2017/05/08 14:14:08 4037200794235010051 serving raw html: /home/aerth/go/src/github.com/aerth/markdownd/docs/test.html
-	2017/05/08 14:14:08 4037200794235010051 closed
-	2017/05/08 14:14:09 3916589616287113937 [::1]:58338 GET / -> docs/index.md
-	2017/05/08 14:14:09 3916589616287113937 serving markdown: /home/aerth/go/src/github.com/aerth/markdownd/docs/index.md
-	2017/05/08 14:14:09 3916589616287113937 closed
