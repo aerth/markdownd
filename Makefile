@@ -17,7 +17,11 @@ test:
 docker-build:
 	docker build -t aerth/markdownd --network host .
 docker-run: 
-	docker run -it -v "${PWD}:/opt" -p "127.0.0.1:8080:8080" aerth/markdownd
+	@echo Serving http://localhost:8888
+	docker run -it \
+	  -v "${PWD}:/opt" \
+	  -p "127.0.0.1:8888:8080" \
+	  aerth/markdownd -http=:8080 -index=README.md /opt
 
 .PHONY += clean
 .PHONY += install

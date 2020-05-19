@@ -12,4 +12,4 @@ WORKDIR /root
 COPY --from=builder /bin/markdownd /bin/markdownd
 
 EXPOSE 8080
-CMD ["markdownd"]
+ENTRYPOINT ["markdownd"]
