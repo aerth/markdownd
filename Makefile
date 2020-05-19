@@ -1,6 +1,8 @@
 # Copyright 2017-2020 aerth <aerth@riseup.net>
 # Markdownd (latest source: https://github.com/aerth/markdownd)
 
+INSTALLDIR ?= /usr/local/bin/
+
 # build static linked markdownd
 export GOFLAGS=-tags=netgo,osusergo
 
@@ -9,7 +11,7 @@ markdownd: *.go
 clean:
 	rm -f ./markdownd
 install: markdownd
-	install markdownd /usr/local/bin/
+	@install markdownd ${INSTALLDIR} && echo "installation complete"
 test:
 	go test -v ./...
 docker-build:
