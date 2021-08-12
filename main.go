@@ -38,7 +38,7 @@ import (
 	"time"
 
 	"github.com/russross/blackfriday"
-	"github.com/shurcool/github_flavored_markdown"
+	"github.com/shurcooL/github_flavored_markdown"
 	"github.com/sourcegraph/syntaxhighlight"
 )
 
@@ -57,7 +57,7 @@ var (
 // log to file
 var logger = log.New(os.Stderr, "[markdownd] ", log.LstdFlags)
 
-const version = "0.0.12"
+const version = "0.0.13"
 const sig = "[markdownd v" + version + "] https://github.com/aerth/markdownd"
 const serverheader = "markdownd/" + version
 const usage = `
